@@ -892,7 +892,7 @@ func calculateNumberOfChunks(contentLength int64, isEncrypted bool) int64 {
 // Warning: This value influences the number of chunk requests and chunker join goroutines
 // per file request.
 // Recommended value is 4 times the io.Copy default buffer value which is 32kB.
-const getFileBufferSize = 4 * 32 * 1024
+const getFileBufferSize = 8 * 4 * 32 * 1024
 
 // bufferedReadSeeker wraps bufio.Reader to expose Seek method
 // from the provied io.ReadSeeker in newBufferedReadSeeker.
