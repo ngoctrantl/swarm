@@ -149,6 +149,10 @@ func (d *Delivery) handleChunkDeliveryMsg(ctx context.Context, sp *Peer, req int
 			// do not sync if peer that is sending us a chunk is closer to the chunk then we are
 			mode = chunk.ModePutRequest
 		}
+
+		if chunk.Proximity(d.kad.BaseAddr(), sp.BzzAddr.Over()) == 0 {
+			metrics.GetOrRegisterCounter(fmt.Sprintf("retrieved_chunk.%x", sp.BzzAddr.Over()), nil).Inc(1)
+		}
 	case *ChunkDeliveryMsgSyncing:
 		msg = (*ChunkDeliveryMsg)(r)
 		mode = chunk.ModePutSync

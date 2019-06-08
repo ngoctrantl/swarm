@@ -846,7 +846,8 @@ func (s *Server) HandleGetFile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// check the root chunk exists by retrieving the file's size
-	if _, err := reader.Size(r.Context(), nil); err != nil {
+	sz, err := reader.Size(r.Context(), nil)
+	if err != nil {
 		getFileNotFound.Inc(1)
 		respondError(w, r, fmt.Sprintf("file not found %s: %s", uri, err), http.StatusNotFound)
 		return
@@ -862,7 +863,18 @@ func (s *Server) HandleGetFile(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=\"%s\"", fileName))
 
-	http.ServeContent(w, r, fileName, time.Now(), newBufferedReadSeeker(reader, getFileBufferSize))
+	//http.ServeContent(w, r, fileName, time.Now(), newBufferedReadSeeker(reader, getFileBufferSize))
+
+	f, err := os.Create("/tmp/dat")
+	if err != nil {
+		panic(err)
+	}
+
+	if err := f.Truncate(sz); err != nil {
+		panic(err)
+	}
+
+	fmt.Fprintf(w, "success\n")
 }
 
 // calculateNumberOfChunks calculates the number of chunks in an arbitrary content length
