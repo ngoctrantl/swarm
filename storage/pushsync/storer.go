@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"fmt"
 
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -74,7 +75,7 @@ func (s *Storer) handleChunkMsg(msg []byte) error {
 	if err != nil {
 		return err
 	}
-	log.Debug("Handler", "chunk", label(chmsg.Addr), "origin", label(chmsg.Origin), "self", s.ps.BaseAddr())
+	log.Debug("Handler", "chunk", label(chmsg.Addr), "origin", label(chmsg.Origin), "self", fmt.Sprintf("%x", s.ps.BaseAddr()))
 	return s.processChunkMsg(chmsg)
 }
 
