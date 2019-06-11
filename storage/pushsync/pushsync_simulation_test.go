@@ -154,7 +154,7 @@ func uploadAndDownload(ctx context.Context, sim *simulation.Simulation, errc cha
 	log.Debug("downloaded", "peer", did, "chunks", chunkCnt, "tagname", tagname)
 }
 
-// newServiceFunc construcs the minimum service needed for a simulation test for Push Sync, namely:
+// newServiceFunc constructs a minimal service needed for a simulation test for Push Sync, namely:
 // localstore, netstore, stream and pss
 func newServiceFunc(ctx *adapters.ServiceContext, bucket *sync.Map) (node.Service, func(), error) {
 	// setup localstore

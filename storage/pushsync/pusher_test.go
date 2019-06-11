@@ -190,7 +190,7 @@ func delayResponse() bool {
 // after a random delay
 // The test checks:
 // - if sync function is called on chunks in order of insertion (FIFO)
-// - repeated sending is attemped only if retryInterval time passed
+// - repeated sending is attempted only if retryInterval time passed
 // - already synced chunks are not resynced
 // - if no more data inserted, the db is emptied shortly
 func TestPusher(t *testing.T) {
