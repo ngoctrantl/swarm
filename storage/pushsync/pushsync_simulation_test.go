@@ -55,8 +55,8 @@ var (
 // * downloader downloads the chunk
 // Trials are run concurrently
 func TestPushSyncSimulation(t *testing.T) {
-	nodeCnt := 16
-	chunkCnt := 1000
+	nodeCnt := 4
+	chunkCnt := 500
 	trials := 10
 	err := testSyncerWithPubSub(nodeCnt, chunkCnt, trials, newServiceFunc)
 	if err != nil {
