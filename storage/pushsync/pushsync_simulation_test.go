@@ -198,7 +198,7 @@ func newServiceFunc(ctx *adapters.ServiceContext, bucket *sync.Map) (node.Servic
 	pubSub := pss.NewPubSub(ps)
 
 	// set up syncer
-	p := New(lstore, pubSub, chunk.NewTags())
+	p := NewPusher(lstore, pubSub, chunk.NewTags())
 	bucket.Store(bucketKeyPushSyncer, p)
 
 	// setup storer

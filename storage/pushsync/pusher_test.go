@@ -273,7 +273,7 @@ func TestPusher(t *testing.T) {
 	// construct the mock push sync index iterator
 	tp := newTestPushSyncIndex(chunkCnt, tagIDs, tags, sent)
 	// start push syncing in a go routine
-	p := New(tp, ps, tags)
+	p := NewPusher(tp, ps, tags)
 	defer p.Close()
 	// collect synced chunks until all chunks synced
 	// wait on errc for errors on any thread
@@ -377,7 +377,7 @@ func TestPushSyncAndStoreWithLoopbackPubSub(t *testing.T) {
 	// construct the mock push sync index iterator
 	tp := newTestPushSyncIndex(chunkCnt, tagIDs, tags, sent)
 	// start push syncing in a go routine
-	p := New(tp, ps, tags)
+	p := NewPusher(tp, ps, tags)
 	defer p.Close()
 
 	// set up a number of storers

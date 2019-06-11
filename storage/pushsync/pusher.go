@@ -59,12 +59,12 @@ type pushedItem struct {
 	synced bool       // set when chunk got synced
 }
 
-// New contructs a Pusher and starts up the push sync protocol
+// NewPusher contructs a Pusher and starts up the push sync protocol
 // takes
 // - a DB interface to subscribe to push sync index to allow iterating over recently stored chunks
 // - a pubsub interface to send chunks and receive statements of custody
 // - tags that hold the several tag
-func New(store DB, ps PubSub, tags *chunk.Tags) *Pusher {
+func NewPusher(store DB, ps PubSub, tags *chunk.Tags) *Pusher {
 	p := &Pusher{
 		store:    store,
 		tags:     tags,
