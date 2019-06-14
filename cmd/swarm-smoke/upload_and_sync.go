@@ -185,8 +185,8 @@ func getChunksBitVectorFromHost(client *rpc.Client, addrs []storage.Address) (st
 		var pageChunks string
 		// get current page size, so that we avoid a slice out of bounds on the last page
 		pagesize := trackChunksPageSize
-		if cap(addrs) < trackChunksPageSize {
-			pagesize = cap(addrs)
+		if len(addrs) < trackChunksPageSize {
+			pagesize = len(addrs)
 		}
 
 		err := client.Call(&pageChunks, "bzz_has", addrs[:pagesize])
