@@ -16,10 +16,43 @@
 
 package spec
 
-import "github.com/ethersphere/swarm/storage"
+import (
+	"context"
+
+	"github.com/ethereum/go-ethereum/p2p/enode"
+	"github.com/ethersphere/swarm/storage"
+)
+
+type StreamPeer interface {
+	/*
+
+	   AddInterval(start, end uint64, peerStreamKey string) : error
+	   HandleMsg(ctx context.Context, msg interface{}) : error
+	   Left()
+	   NextInterval(peerStreamKey string) : uint64, uint64, error
+	   -collectBatch(ctx context.Context, bin uint, from, to uint64) : []byte, uint64, uint64, error
+	   -getIntervalsKey(bin uint) : string
+	   -getOrCreateInterval(bin uint) : *intervals.Intervals, error
+	  	   SealBatch(ruid uint) : chan error
+	*/
+	ID() enode.ID
+
+	HandleChunkDelivery(context.Context, *ChunkDelivery)
+	HandleGetRange(ctx context.Context, msg *GetRange)
+	HandleOfferedHashes(ctx context.Context, msg *OfferedHashes)
+	HandleStreamInfoReq(ctx context.Context, msg *StreamInfoReq)
+	HandleStreamInfoRes(ctx context.Context, msg *StreamInfoRes)
+	HandleWantedHashes(ctx context.Context, msg *WantedHashes)
+	RequestStreamRange(ctx context.Context, stream string, bin uint, cursor uint64) error
+}
+
+// StreamCaps is sent between two nodes to advertise which streams are supported
+type StreamCaps struct {
+	Caps []string
+}
 
 type StreamInfoReq struct {
-	Streams []uint
+	Streams []string
 }
 
 type StreamInfoRes struct {
@@ -36,7 +69,7 @@ type GetRange struct {
 	Ruid      uint
 	Stream    string
 	From      uint64
-	To        uint64 `rlp:nil`
+	To        *uint64 `rlp:"nil"`
 	BatchSize uint
 	Roundtrip bool
 }
@@ -53,9 +86,8 @@ type WantedHashes struct {
 }
 
 type ChunkDelivery struct {
-	Ruid      uint
-	LastIndex uint
-	Chunks    []DeliveredChunk
+	Ruid   uint
+	Chunks []DeliveredChunk
 }
 
 type DeliveredChunk struct {

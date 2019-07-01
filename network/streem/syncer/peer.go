@@ -70,27 +70,24 @@ type Want struct {
 // Peer is the Peer extension for the streaming protocol
 type Peer struct {
 	*network.BzzPeer
-	mtx          sync.Mutex
-	streamsDirty bool // a request for StreamInfo is underway and awaiting reply
-	syncer       *SwarmSyncer
+	mtx    sync.Mutex
+	syncer *SwarmSyncer
 
-	streamCursors     map[uint]uint64           // key: bin, value: session cursor. when unset - we are not interested in that bin
-	historicalStreams map[uint]*syncStreamFetch //maintain state for each stream fetcher on the client side
-	openWants         map[uint]*Want            //maintain open wants on the client side
-	openOffers        map[uint]Offer            // maintain open offers on the server side
-	quit              chan struct{}             //peer is going offline
+	streamCursors map[uint]uint64 // key: bin, value: session cursor. when unset - we are not interested in that bin
+	openWants     map[uint]*Want  // maintain open wants on the client side
+	openOffers    map[uint]Offer  // maintain open offers on the server side
+	quit          chan struct{}   // peer is going offline
 }
 
 // NewPeer is the constructor for Peer
 func NewPeer(peer *network.BzzPeer, s *SwarmSyncer) *Peer {
 	p := &Peer{
-		BzzPeer:           peer,
-		streamCursors:     make(map[uint]uint64),
-		historicalStreams: make(map[uint]*syncStreamFetch),
-		openWants:         make(map[uint]*Want),
-		openOffers:        make(map[uint]Offer),
-		syncer:            s,
-		quit:              make(chan struct{}),
+		BzzPeer:       peer,
+		streamCursors: make(map[uint]uint64),
+		openWants:     make(map[uint]*Want),
+		openOffers:    make(map[uint]Offer),
+		syncer:        s,
+		quit:          make(chan struct{}),
 	}
 	return p
 }
@@ -211,7 +208,6 @@ func (p *Peer) requestStreamRange(ctx context.Context, stream string, bin uint, 
 		// from the end cursor, because...
 	}
 	streamFetch := newSyncStreamFetch(uint(bin))
-	p.historicalStreams[uint(bin)] = streamFetch
 	g := GetRange{
 		Ruid:      uint(rand.Uint32()),
 		Stream:    stream,
@@ -796,16 +792,6 @@ func doPeerSubUpdate(p *Peer, subs, quits []uint) {
 	for _, v := range quits {
 		log.Debug("removing cursor info for peer", "peer", p.ID(), "bin", v, "cursors", p.streamCursors, "quits", quits)
 		delete(p.streamCursors, uint(v))
-
-		if hs, ok := p.historicalStreams[uint(v)]; ok {
-			log.Debug("closing historical stream for peer", "peer", p.ID(), "bin", v, "historicalStream", hs)
-
-			close(hs.quit)
-			// todo: wait for the hs.done to close?
-			delete(p.historicalStreams, uint(v))
-		} else {
-			// this could happen when the cursor was 0 thus the historical stream was not created - do nothing
-		}
 	}
 }
 
