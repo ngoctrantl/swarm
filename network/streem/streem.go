@@ -32,6 +32,7 @@ import (
 	"github.com/ethersphere/swarm/chunk"
 	"github.com/ethersphere/swarm/log"
 	"github.com/ethersphere/swarm/network"
+	"github.com/ethersphere/swarm/network/bitvector"
 	"github.com/ethersphere/swarm/network/streem/spec"
 	"github.com/ethersphere/swarm/network/timeouts"
 	"github.com/ethersphere/swarm/p2p/protocols"
@@ -59,10 +60,77 @@ var (
 	createStreamsDelay = 50 * time.Millisecond //to avoid a race condition where we send a message to a server that hasnt set up yet
 )
 
-// Syncer is the base type that handles all client/server operations on a node
+type Offer struct {
+	Ruid      uint
+	Hashes    []byte
+	Requested time.Time
+}
+
+type Want struct {
+	ruid      uint
+	from      uint64
+	to        uint64
+	stream    string
+	hashes    map[string]bool
+	bv        *bitvector.BitVector
+	requested time.Time
+	wg        *sync.WaitGroup
+	remaining uint64
+	chunks    chan chunk.Chunk
+	done      chan error
+}
+
+type BasePeer struct {
+	*network.BzzPeer
+	streamHandlers map[string]spec.StreamPeer
+	openWants      map[uint]*Want
+	openOffers     map[uint]Offer
+}
+
+func (b *BasePeer) HandleMsg(ctx context.Context, msg interface{}) error {
+	switch msg := msg.(type) {
+	case *spec.StreamInfoReq:
+		if p, ok := b.streamHandlers[stream]; !ok {
+			// send a stream not supported message, this should not be fatal
+			// this should be accounted for in the StreamInfoReq message send
+		} else {
+			p.Send()
+			go p.handleStreamInfoReq(ctx, msg)
+		}
+	case *spec.StreamInfoRes:
+		// check if ruid has a stream association, if it does, it means it is supported
+		go p.handleStreamInfoRes(ctx, msg)
+	case *spec.GetRange:
+		if p, ok := b.streamHandlers[stream]; !ok {
+			// send a stream not supported message, this should not be fatal
+			// this should be accounted for in the StreamInfoReq message send
+		} else {
+			go p.handleGetRange(ctx, msg)
+		}
+	case *spec.OfferedHashes:
+		go p.handleOfferedHashes(ctx, msg)
+	case *spec.WantedHashes:
+		go p.handleWantedHashes(ctx, msg)
+	case *spec.ChunkDelivery:
+		go p.handleChunkDelivery(ctx, msg)
+	default:
+		return fmt.Errorf("unknown message type: %T", msg)
+	}
+	return nil
+}
+
+func (b *BasePeer) checkStreamSupported(stream string) {
+	if b, ok := b.streamHandlers[stream]; !ok {
+		return nil, false
+	} else {
+		return b, true
+	}
+}
+
+// BaseStream is the base type that handles all client/server operations on a node
 // it is instantiated once per stream protocol instance, that is, it should have
 // one instance per node
-type BaseStreem struct {
+type BaseStream struct {
 	mtx            sync.RWMutex                 // mutex used for global operations (such as adding or removing peers)
 	intervalsStore state.Store                  // refactoring candidate - peer could have delegate functions that point to the interval store functions
 	protocolPeers  map[enode.ID]spec.StreamPeer // a map of peers per protocol. key: protocol name, value: map of peers by enode.ID
@@ -78,8 +146,8 @@ type BaseStreem struct {
 	quit chan struct{} // initiates shutdown sequence
 }
 
-func NewBaseStreem(intervalsStore state.Store, kad *network.Kademlia, ns *storage.NetStore) *BaseStreem {
-	bs := &BaseStreem{
+func NewBaseStream(intervalsStore state.Store, kad *network.Kademlia, ns *storage.NetStore) *BaseStream {
+	bs := &BaseStream{
 		intervalsStore: intervalsStore,
 		protocolPeers:  make(map[string]map[enode.ID]spec.StreamPeer),
 		kad:            kad,
@@ -102,13 +170,13 @@ func (s *baseStreem) registerPeerFunc(subProtocol string, peerFunc func(*p2p.Pee
 	return nil
 }
 
-func (s *BaseStreem) addPeer(p *Peer) {
+func (s *BaseStream) addPeer(p *Peer) {
 	s.mtx.Lock()
 	defer s.mtx.Unlock()
 	s.peers[p.ID()] = p
 }
 
-func (s *BaseStreem) removePeer(p *Peer) {
+func (s *BaseStream) removePeer(p *Peer) {
 	s.mtx.Lock()
 	defer s.mtx.Unlock()
 	if _, found := s.peers[p.ID()]; found {
@@ -123,13 +191,26 @@ func (s *BaseStreem) removePeer(p *Peer) {
 }
 
 // Run is being dispatched when 2 nodes connect
-func (s *BaseStreem) Run(p *p2p.Peer, rw p2p.MsgReadWriter) error {
+func (s *BaseStream) Run(p *p2p.Peer, rw p2p.MsgReadWriter) error {
+	/*
+				2 peers connect
+				we get the p2p peer here
+				the p2p peer has to mux the different streams internally
+				the base stream must create the peer with the different stream
+				handlers that the base stream was instantiated with
+				once a request comes in, the server creates the peer (lazy)
+		we must send a client message, lazy load won't work because someone has to initiate
+
+	*/
+
 	peer := protocols.NewPeer(p, rw, s.spec)
 	bp := network.NewBzzPeer(peer)
 
 	np := network.NewPeer(bp, s.kad)
 	s.kad.On(np)
 	defer s.kad.Off(np)
+
+	basePeer
 	for protoName, _ := range s.newPeerFuncs {
 
 	}
@@ -137,7 +218,7 @@ func (s *BaseStreem) Run(p *p2p.Peer, rw p2p.MsgReadWriter) error {
 	return peer.Run(s.HandleMsg)
 }
 
-func (s *BaseStreem) Protocols() []p2p.Protocol {
+func (s *BaseStream) Protocols() []p2p.Protocol {
 	return []p2p.Protocol{
 		{
 			Name:    "bzz-streem",
@@ -148,7 +229,7 @@ func (s *BaseStreem) Protocols() []p2p.Protocol {
 	}
 }
 
-func (r *BaseStreem) APIs() []rpc.API {
+func (r *BaseStream) APIs() []rpc.API {
 	return []rpc.API{
 		{
 			Namespace: "bzz-streem",
@@ -161,27 +242,27 @@ func (r *BaseStreem) APIs() []rpc.API {
 
 // Additional public methods accessible through API for pss
 type API struct {
-	*BaseStreem
+	*BaseStream
 }
 
-func NewAPI(s *BaseStreem) *API {
-	return &API{SwarmSyncer: s}
+func NewAPI(s *BaseStream) *API {
+	return &API{BaseStream: s}
 }
 
-func (s *BaseStreem) Start(server *p2p.Server) error {
-	log.Info("syncer starting")
+func (s *BaseStream) Start(server *p2p.Server) error {
+	log.Info("stream protocol starting")
 	return nil
 }
 
-func (s *BaseStreem) Stop() error {
-	log.Info("syncer shutting down")
+func (s *BaseStream) Stop() error {
+	log.Info("stream proto shutting down")
 	s.mtx.Lock()
 	defer s.mtx.Unlock()
 	close(s.quit)
 	return nil
 }
 
-func (s *BaseStreem) NeedData(ctx context.Context, key []byte) (loaded bool, wait func(context.Context) error) {
+func (s *BaseStream) NeedData(ctx context.Context, key []byte) (loaded bool, wait func(context.Context) error) {
 	start := time.Now()
 
 	fi, loaded, ok := s.netStore.GetOrCreateFetcher(ctx, key, "syncer")
@@ -202,7 +283,7 @@ func (s *BaseStreem) NeedData(ctx context.Context, key []byte) (loaded bool, wai
 }
 
 // GetData retrieves the actual chunk from netstore
-func (s *BaseStreem) GetData(ctx context.Context, key []byte) ([]byte, error) {
+func (s *BaseStream) GetData(ctx context.Context, key []byte) ([]byte, error) {
 	ch, err := s.netStore.Store.Get(ctx, chunk.ModeGetSync, storage.Address(key))
 	if err != nil {
 		return nil, err

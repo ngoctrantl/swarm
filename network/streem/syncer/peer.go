@@ -84,8 +84,6 @@ func NewPeer(peer *network.BzzPeer, s *SwarmSyncer) *Peer {
 	p := &Peer{
 		BzzPeer:       peer,
 		streamCursors: make(map[uint]uint64),
-		openWants:     make(map[uint]*Want),
-		openOffers:    make(map[uint]Offer),
 		syncer:        s,
 		quit:          make(chan struct{}),
 	}

@@ -52,10 +52,12 @@ type StreamCaps struct {
 }
 
 type StreamInfoReq struct {
+	Ruid    uint
 	Streams []string
 }
 
 type StreamInfoRes struct {
+	Ruid    uint
 	Streams []StreamDescriptor
 }
 
