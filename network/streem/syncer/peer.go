@@ -73,6 +73,8 @@ type Peer struct {
 	mtx    sync.Mutex
 	syncer *SwarmSyncer
 
+	dataSources map[string]func () (<-chan, func())
+
 	streamCursors map[uint]uint64 // key: bin, value: session cursor. when unset - we are not interested in that bin
 	openWants     map[uint]*Want  // maintain open wants on the client side
 	openOffers    map[uint]Offer  // maintain open offers on the server side
