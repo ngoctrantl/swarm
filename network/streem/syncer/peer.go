@@ -156,7 +156,7 @@ func (p *Peer) handleStreamInfoRes(ctx context.Context, msg *StreamInfoRes) {
 	}
 
 	for _, s := range msg.Streams {
-		bin, err := syncStreamToBin(s.Name) //ParseStream(s.Name)
+		bin, err := syncStreamToBin(s.Name)
 		if err != nil {
 			log.Error("error parsing stream", "stream", s.Name)
 			p.Drop()
